@@ -1,0 +1,552 @@
+Here are all the solutions for **Ficha 5 - Modelação em Django**. You can copy-paste these directly or give them to Claude Code.
+
+---
+
+## Complete Project Setup (Section 2)
+
+```bash
+# Terminal commands to set up the project
+pip install django
+django-admin startproject project .
+python manage.py runserver
+# (stop with Ctrl+C)
+python manage.py migrate
+python manage.py createsuperuser
+# username: admin, password: (your choice)
+```
+
+---
+
+## App: `pessoas` (Section 3)
+
+### Create the app
+```bash
+python manage.py startapp pessoas
+```
+
+### `project/settings.py` — add to INSTALLED_APPS:
+```python
+INSTALLED_APPS = [
+    # ...
+    'pessoas',
+]
+```
+
+### `pessoas/models.py`
+```python
+from django.db import models
+
+class Pessoa(models.Model):
+    nome = models.CharField(max_length=100)
+    idade = models.IntegerField()
+
+    def __str__(self):
+        return f'{self.nome}: {self.idade} anos'
+```
+
+### `pessoas/admin.py`
+```python
+from django.contrib import admin
+from .models import Pessoa
+
+class PessoaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "idade",)
+    ordering = ("nome", "idade",)
+    search_fields = ("nome",)
+
+admin.site.register(Pessoa, PessoaAdmin)
+```
+
+### Run migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## Exercise 1: `escola` (Escola primária)
+
+**Enunciado:** Uma escola primária tem várias turmas. Cada turma tem vários alunos, mas cada aluno pertence a uma única turma. Cada professor tem uma única turma.
+
+**Exemplo:** A Turma A tem a professora Ana e 3 alunos (João, Rita, Pedro). A Turma B tem o professor Bruno e 2 alunos (Sara, Miguel).
+
+**Entidades e Relações:**
+- **Turma**: id, nome
+- **Professor**: id, nome, email → relação 1:1 com Turma (cada professor tem uma única turma)
+- **Aluno**: id, nome, data_nascimento → relação N:1 com Turma (cada aluno pertence a uma única turma, cada turma tem vários alunos)
+
+### Create the app
+```bash
+python manage.py startapp escola
+```
+
+### `project/settings.py` — add `'escola'` to INSTALLED_APPS
+
+### `escola/models.py`
+```python
+from django.db import models
+
+class Turma(models.Model):
+    nome = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.nome
+
+class Professor(models.Model):
+    nome = models.CharField(max_length=100)
+    email = models.EmailField()
+    turma = models.OneToOneField(Turma, on_delete=models.CASCADE, related_name='professor')
+
+    def __str__(self):
+        return self.nome
+
+class Aluno(models.Model):
+    nome = models.CharField(max_length=100)
+    data_nascimento = models.DateField(null=True, blank=True)
+    turma = models.ForeignKey(Turma, on_delete=models.CASCADE, related_name='alunos')
+
+    def __str__(self):
+        return self.nome
+```
+
+### `escola/admin.py`
+```python
+from django.contrib import admin
+from .models import Turma, Professor, Aluno
+
+class TurmaAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+class ProfessorAdmin(admin.ModelAdmin):
+    list_display = ("nome", "email", "turma",)
+    search_fields = ("nome",)
+
+class AlunoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "data_nascimento", "turma",)
+    ordering = ("nome",)
+    search_fields = ("nome",)
+
+admin.site.register(Turma, TurmaAdmin)
+admin.site.register(Professor, ProfessorAdmin)
+admin.site.register(Aluno, AlunoAdmin)
+```
+
+### Migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## Exercise 2: `ginasio` (Ginásio)
+
+**Enunciado:** Um ginásio possui vários personal trainers (PTs). Cada membro do ginásio pode agendar sessões de treino com qualquer PT. Cada sessão é agendada para um cliente específico e um PT específico, e possui data (DateField) e hora (TimeField).
+
+**Exemplo:** O PT Carlos tem uma sessão com o membro Ana no dia 2026-03-20 às 10:00. O PT Diogo tem uma sessão com o membro Bruno às 14:00 no mesmo dia.
+
+**Entidades e Relações:**
+- **PT**: id, nome, especialidade
+- **Membro**: id, nome, email
+- **Sessao**: id, pt (FK→PT), membro (FK→Membro), data, hora — relação N:1 com PT e N:1 com Membro (a sessão é a tabela intermédia)
+
+### Create the app
+```bash
+python manage.py startapp ginasio
+```
+
+### `project/settings.py` — add `'ginasio'` to INSTALLED_APPS
+
+### `ginasio/models.py`
+```python
+from django.db import models
+
+class PT(models.Model):
+    nome = models.CharField(max_length=100)
+    especialidade = models.CharField(max_length=100, blank=True)
+
+    def __str__(self):
+        return self.nome
+
+class Membro(models.Model):
+    nome = models.CharField(max_length=100)
+    email = models.EmailField()
+
+    def __str__(self):
+        return self.nome
+
+class Sessao(models.Model):
+    pt = models.ForeignKey(PT, on_delete=models.CASCADE, related_name='sessoes')
+    membro = models.ForeignKey(Membro, on_delete=models.CASCADE, related_name='sessoes')
+    data = models.DateField()
+    hora = models.TimeField()
+
+    class Meta:
+        unique_together = ('pt', 'data', 'hora')
+
+    def __str__(self):
+        return f'{self.membro} com {self.pt} em {self.data} às {self.hora}'
+```
+
+### `ginasio/admin.py`
+```python
+from django.contrib import admin
+from .models import PT, Membro, Sessao
+
+class PTAdmin(admin.ModelAdmin):
+    list_display = ("nome", "especialidade",)
+    search_fields = ("nome",)
+
+class MembroAdmin(admin.ModelAdmin):
+    list_display = ("nome", "email",)
+    search_fields = ("nome",)
+
+class SessaoAdmin(admin.ModelAdmin):
+    list_display = ("pt", "membro", "data", "hora",)
+    ordering = ("data", "hora",)
+    search_fields = ("pt__nome", "membro__nome",)
+
+admin.site.register(PT, PTAdmin)
+admin.site.register(Membro, MembroAdmin)
+admin.site.register(Sessao, SessaoAdmin)
+```
+
+### Migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## Exercise 3: `receita` (Receitas)
+
+**Enunciado:** Uma receita pode usar vários ingredientes. Cada ingrediente pode aparecer em várias receitas. Um utilizador pode marcar receitas como favoritas.
+
+**Exemplo:** A receita "Bolo de Chocolate" usa os ingredientes Chocolate, Farinha, Ovos. O utilizador Maria marcou "Bolo de Chocolate" como favorita.
+
+**Entidades e Relações:**
+- **Ingrediente**: id, nome — relação N:M com Receita
+- **Receita**: id, nome, descricao, ingredientes (M2M) — relação N:M com Utilizador (favoritas)
+- **Utilizador**: id, nome, email, favoritas (M2M→Receita)
+
+### Create the app
+```bash
+python manage.py startapp receita
+```
+
+### `project/settings.py` — add `'receita'` to INSTALLED_APPS
+
+### `receita/models.py`
+```python
+from django.db import models
+
+class Ingrediente(models.Model):
+    nome = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.nome
+
+class Receita(models.Model):
+    nome = models.CharField(max_length=200)
+    descricao = models.TextField(blank=True)
+    ingredientes = models.ManyToManyField(Ingrediente, related_name='receitas')
+
+    def __str__(self):
+        return self.nome
+
+class Utilizador(models.Model):
+    nome = models.CharField(max_length=100)
+    email = models.EmailField()
+    favoritas = models.ManyToManyField(Receita, related_name='utilizadores_favoritos', blank=True)
+
+    def __str__(self):
+        return self.nome
+```
+
+### `receita/admin.py`
+```python
+from django.contrib import admin
+from .models import Ingrediente, Receita, Utilizador
+
+class IngredienteAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+class ReceitaAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+    filter_horizontal = ("ingredientes",)
+
+class UtilizadorAdmin(admin.ModelAdmin):
+    list_display = ("nome", "email",)
+    search_fields = ("nome",)
+    filter_horizontal = ("favoritas",)
+
+admin.site.register(Ingrediente, IngredienteAdmin)
+admin.site.register(Receita, ReceitaAdmin)
+admin.site.register(Utilizador, UtilizadorAdmin)
+```
+
+### Migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## Exercise 4: `loja` (Loja online)
+
+**Enunciado:** Uma loja online vende produtos. Cada produto pertence a uma categoria. Cada cliente pode fazer vários pedidos. Um pedido pode conter vários items, sendo cada item um produto específico e a sua quantidade. Cada cliente tem uma morada única associada ao perfil.
+
+**Exemplo:** A Categoria "Eletrónica" tem o produto "Telemóvel" (€299). O cliente João (morada: Rua X, Lisboa) fez um pedido com 2 telemóveis.
+
+**Entidades e Relações:**
+- **Categoria**: id, nome — relação 1:N com Produto
+- **Produto**: id, nome, preco, categoria (FK→Categoria)
+- **Morada**: id, rua, cidade, codigo_postal — relação 1:1 com Cliente
+- **Cliente**: id, nome, email, morada (OneToOne→Morada)
+- **Pedido**: id, cliente (FK→Cliente), data — relação 1:N com ItemPedido
+- **ItemPedido**: id, pedido (FK→Pedido), produto (FK→Produto), quantidade
+
+### Create the app
+```bash
+python manage.py startapp loja
+```
+
+### `project/settings.py` — add `'loja'` to INSTALLED_APPS
+
+### `loja/models.py`
+```python
+from django.db import models
+
+class Categoria(models.Model):
+    nome = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.nome
+
+class Produto(models.Model):
+    nome = models.CharField(max_length=200)
+    preco = models.DecimalField(max_digits=10, decimal_places=2)
+    categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, related_name='produtos')
+
+    def __str__(self):
+        return self.nome
+
+class Morada(models.Model):
+    rua = models.CharField(max_length=200)
+    cidade = models.CharField(max_length=100)
+    codigo_postal = models.CharField(max_length=20)
+
+    def __str__(self):
+        return f'{self.rua}, {self.cidade}'
+
+class Cliente(models.Model):
+    nome = models.CharField(max_length=100)
+    email = models.EmailField()
+    morada = models.OneToOneField(Morada, on_delete=models.CASCADE, related_name='cliente')
+
+    def __str__(self):
+        return self.nome
+
+class Pedido(models.Model):
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pedidos')
+    data = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Pedido {self.id} de {self.cliente}'
+
+class ItemPedido(models.Model):
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='itens')
+    produto = models.ForeignKey(Produto, on_delete=models.CASCADE, related_name='itens_pedido')
+    quantidade = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f'{self.quantidade}x {self.produto} (Pedido {self.pedido.id})'
+```
+
+### `loja/admin.py`
+```python
+from django.contrib import admin
+from .models import Categoria, Produto, Morada, Cliente, Pedido, ItemPedido
+
+class CategoriaAdmin(admin.ModelAdmin):
+    list_display = ("nome",)
+    search_fields = ("nome",)
+
+class ProdutoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "preco", "categoria",)
+    ordering = ("nome",)
+    search_fields = ("nome",)
+
+class MoradaAdmin(admin.ModelAdmin):
+    list_display = ("rua", "cidade", "codigo_postal",)
+    search_fields = ("cidade",)
+
+class ClienteAdmin(admin.ModelAdmin):
+    list_display = ("nome", "email", "morada",)
+    search_fields = ("nome",)
+
+class ItemPedidoInline(admin.TabularInline):
+    model = ItemPedido
+    extra = 1
+
+class PedidoAdmin(admin.ModelAdmin):
+    list_display = ("id", "cliente", "data",)
+    ordering = ("-data",)
+    search_fields = ("cliente__nome",)
+    inlines = [ItemPedidoInline]
+
+class ItemPedidoAdmin(admin.ModelAdmin):
+    list_display = ("pedido", "produto", "quantidade",)
+
+admin.site.register(Categoria, CategoriaAdmin)
+admin.site.register(Produto, ProdutoAdmin)
+admin.site.register(Morada, MoradaAdmin)
+admin.site.register(Cliente, ClienteAdmin)
+admin.site.register(Pedido, PedidoAdmin)
+admin.site.register(ItemPedido, ItemPedidoAdmin)
+```
+
+### Migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## Exercise 5: `quizz` (Aplicação do Quizz)
+
+This one is mentioned in Section 4 but has no specific description in the exercises — you're expected to design it yourself. Here's a reasonable model:
+
+**Entidades:** A Quiz has multiple Questions. Each Question has multiple Answer options. One answer per question is correct. Users can take quizzes and their attempts are recorded.
+
+### Create the app
+```bash
+python manage.py startapp quizz
+```
+
+### `project/settings.py` — add `'quizz'` to INSTALLED_APPS
+
+### `quizz/models.py`
+```python
+from django.db import models
+
+class Quiz(models.Model):
+    titulo = models.CharField(max_length=200)
+    descricao = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.titulo
+
+class Pergunta(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='perguntas')
+    texto = models.TextField()
+
+    def __str__(self):
+        return self.texto[:50]
+
+class Opcao(models.Model):
+    pergunta = models.ForeignKey(Pergunta, on_delete=models.CASCADE, related_name='opcoes')
+    texto = models.CharField(max_length=200)
+    correta = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.texto
+
+class Participante(models.Model):
+    nome = models.CharField(max_length=100)
+    email = models.EmailField()
+
+    def __str__(self):
+        return self.nome
+
+class Tentativa(models.Model):
+    participante = models.ForeignKey(Participante, on_delete=models.CASCADE, related_name='tentativas')
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='tentativas')
+    data = models.DateTimeField(auto_now_add=True)
+    pontuacao = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f'{self.participante} - {self.quiz} ({self.pontuacao} pts)'
+```
+
+### `quizz/admin.py`
+```python
+from django.contrib import admin
+from .models import Quiz, Pergunta, Opcao, Participante, Tentativa
+
+class OpcaoInline(admin.TabularInline):
+    model = Opcao
+    extra = 4
+
+class PerguntaAdmin(admin.ModelAdmin):
+    list_display = ("texto", "quiz",)
+    search_fields = ("texto",)
+    inlines = [OpcaoInline]
+
+class PerguntaInline(admin.TabularInline):
+    model = Pergunta
+    extra = 1
+
+class QuizAdmin(admin.ModelAdmin):
+    list_display = ("titulo",)
+    search_fields = ("titulo",)
+    inlines = [PerguntaInline]
+
+class ParticipanteAdmin(admin.ModelAdmin):
+    list_display = ("nome", "email",)
+    search_fields = ("nome",)
+
+class TentativaAdmin(admin.ModelAdmin):
+    list_display = ("participante", "quiz", "data", "pontuacao",)
+    ordering = ("-data",)
+
+admin.site.register(Quiz, QuizAdmin)
+admin.site.register(Pergunta, PerguntaAdmin)
+admin.site.register(Opcao)
+admin.site.register(Participante, ParticipanteAdmin)
+admin.site.register(Tentativa, TentativaAdmin)
+```
+
+### Migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+---
+
+## Final `project/settings.py` INSTALLED_APPS
+
+```python
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'pessoas',
+    'escola',
+    'ginasio',
+    'receita',
+    'loja',
+    'quizz',
+]
+```
+
+---
+
+## Quick Claude Code Prompt
+
+If you want to give this all to **Claude Code** in one go, you can say:
+
+> "Create a Django project with `django-admin startproject project .` and then create 6 apps: `pessoas`, `escola`, `ginasio`, `receita`, `loja`, and `quizz`. For each app, register it in settings.py, create the models in models.py, register them in admin.py with list_display/ordering/search_fields, then run makemigrations and migrate. Also create a superuser with username `admin`."
+
+Then paste the models.py and admin.py code for each app from above.
